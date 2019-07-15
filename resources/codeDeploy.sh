@@ -1,7 +1,7 @@
 export AWS_DEFAULT_REGION=eu-west-1
 echo $AWS_DEFAULT_REGION
 aws deploy list-deployments --deployment-group-name CCMServiceDevelopment --application-name CCMServiceDevelopment --include-only-statuses Created Queued InProgress > deployments.json 
-sleep(60)
+sleep 60
 cat deployments.json 
 #DID=$(cat deployments.json | awk -F=":" -v RS="," '$1~/"deployments"/ {print}')
 #echo $DID
