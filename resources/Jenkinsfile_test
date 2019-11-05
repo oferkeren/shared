@@ -1,0 +1,94 @@
+@Library('shared')_
+pipeline {
+    agent { label 'ubuntuslave10' }
+    options {
+        timestamps()
+		skipDefaultCheckout()
+    }
+    environment
+    {
+     VERSION = 'latest'
+     PROJECT = 'AniAliservice'
+     IMAGE = 'anialiservice:latest'
+     ECRURL = 'http://366789379256.dkr.ecr.eu-west-1.amazonaws.com'
+     ECRCRED = 'ecr:eu-central-1:tap_ecr'
+
+     }
+
+    tools {
+        maven 'M2_HOME_LINUX_MAVEN_3.6.1'
+        jdk 'JAVA_HOME'
+    }
+    stages {
+        stage ('Checkout Code') {
+            steps {
+            echo 'checkout Code'
+            checkout([$class: 'GitSCM', branches: [[name: '*/$Branch']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false, timeout: 10], [$class: 'SubmoduleOption', disableSubmodules: false, parentCredentials: true, recursiveSubmodules: true, reference: '', trackingSubmodules: false]], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'e4729b13-caae-4669-972f-5307ae6309f4', url: 'https://bitbucket.org/reportydev/anialiservice.git']]])
+            }
+
+        }
+        stage('AniAli Version') {
+            steps {
+                script {
+                  sh '/home/jenkins/ofer/version.sh > commandResult'
+                  result = readFile ('commandResult').trim()
+                  println result
+                }
+            }
+        }
+        stage ('Build MVN') {
+            steps {
+                echo 'Build Service'
+                sh(libraryResource ('mavenAniAli.sh'))
+            }
+        }
+        //stage('Unit Testing') {
+       //     steps {
+       //         sh 'cd ${WORKSPACE} && mvn test'
+       //     }
+      //  }
+       stage ('Docker Build') {
+            steps {
+                script {
+                    sh '/home/jenkins/ofer/version.sh > commandResult'
+                    result = readFile ('commandResult').trim()                
+                    sh "cd $WORKSPACE/ANIALIService && docker build -t aniali_service:\'${result}\' --build-arg JAR_VERSION=${result} ."
+                }
+            }
+        }
+        stage ('Docker push') {
+          steps {
+              script {
+                 sh '/home/jenkins/ofer/version.sh > commandResult'
+                 result = readFile ('commandResult').trim()                  
+         withDockerRegistry(credentialsId: 'ecr:eu-west-1:dab6216e-af1e-45e8-b957-58796cc47fa2', url: 'https://366789379256.dkr.ecr.eu-west-1.amazonaws.com/aniali_service') {
+             sh "docker tag aniali_service:\'${result}\' 366789379256.dkr.ecr.eu-west-1.amazonaws.com/aniali_service:'${result}\'"
+             sh 'docker push 366789379256.dkr.ecr.eu-west-1.amazonaws.com/aniali_service'
+         }
+         }
+        
+          }
+        } 
+        
+    }
+    post {  
+         always {  
+            echo 'This will always run'   
+         }  
+         /*success {  
+             echo 'This will run only if successful'  
+         } 
+          failure {  
+             mail bcc: '', body: "<b>Example</b><br>Project: ${env.JOB_NAME} <br>Build Number: ${env.BUILD_NUMBER} <br> URL de build: ${env.BUILD_URL}", cc: '', charset: 'UTF-8', from: '', mimeType: 'text/html', replyTo: '', subject: "ERROR CI: Project name -> ${env.JOB_NAME}", to: "foo@foomail.com";  
+         } 
+         unstable {  
+             echo 'This will run only if the run was marked as unstable'  
+         }  
+         changed {  
+             echo 'This will run only if the state of the Pipeline has changed'  
+             echo 'For example, if the Pipeline was previously failing but is now successful'  
+         } */ 
+     } 
+
+}
+
